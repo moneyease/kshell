@@ -152,8 +152,14 @@ help () {
 
 # Uncomment the following line if you don't like systemctl's auto-paging feature:
 # export SYSTEMD_PAGER=
-if [ -z $NAMESPACE ];then
-	export NAMESPACE=$1
+if [ -z $SESSION ];then
+#	export NAMESPACE=$NAMESPACE
+	export SESSION=`date +%s`
+	tmux -f ~/.tmux.conf new-session -s $SESSION -d
+	tmux set-option -s -t $SESSION default-command "env NAMESPACE=$NAMESPACE /bin/bash --rcfile ~/.kbashrc"
+	tmux send-key "source ~/.kbashrc" Enter
+	tmux attach-session -d
+	tmux rename-window $NAMESPACE
 fi
 export PS1="\e[0;32m$NAMESPACE>\e[m"
 # User specific aliases and functions
