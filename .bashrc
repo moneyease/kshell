@@ -7,13 +7,22 @@ fi
 
 kshell () {
 	if [ "$#" -eq 1 ]; then 
-#		export NAMESPACE=$1 
-#		source ~/.kbashrc
 		env NAMESPACE=$1 /bin/bash --rcfile ~/.kbashrc
-	else
-		echo "Please set a namespace from the list below [usage: kshell <namespace>]"
-		kubectl get namespaces | grep -v NAME | awk '{print $1}'
+		return
 	fi
+	kubectl get namespaces | awk '{print $1}' | nl -w2 -bp[a-z] -s'. ' 
+	while true; do
+		echo -n "Select a namespace [q to quit] > "
+		read selection
+		if [ $selection -gt 0 ]; then 
+			namespace=$(kubectl get namespaces | grep -v NAME | sed -n "$selection p" | cut -d" " -f1)
+			export NAMESPACE=$namespace 
+			source ~/.kbashrc
+			return
+		else
+			echo "Invalid selection"
+		fi
+	done
 }
 
 
