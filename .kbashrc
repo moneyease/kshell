@@ -134,6 +134,15 @@ split () {
         tmux select-layout even-vertical
 }
 
+change () {
+	if [ "$#" -eq 1 ]; then 
+		export NAMESPACE=$1 
+		source ~/.kbashrc
+	else
+		echo "Please set a namespace from the list below [usage: kshell <namespace>]"
+		kubectl get namespaces | grep -v NAME | awk '{print $1}'
+	fi
+}
 help () {
         echo ""
         echo "  pod       [pod][container]      Display pod status"
@@ -146,17 +155,18 @@ help () {
         echo "  cpto    <local> <remote>        Copy from local to pod"
         echo "  cpfrom  <remote> <local>        Copy from pod to local"
         echo "  log [-f]                        Container log"
-        echo "  split                           Split window in 3 Panes [C-A y to send command to all panes]"
+        echo "  split                           Split panes [C-A y to send command to all panes]"
+        echo "  change [namespace] 		Change namespace"	
         echo ""
 }
 
 # Uncomment the following line if you don't like systemctl's auto-paging feature:
-# export SYSTEMD_PAGER=
+# export SYSTEMD_PAGER=x
 if [ -z $SESSION ];then
-#	export NAMESPACE=$NAMESPACE
 	export SESSION=`date +%s`
 	tmux -f ~/.tmux.conf new-session -s $SESSION -d
 	tmux set-option -s -t $SESSION default-command "env NAMESPACE=$NAMESPACE /bin/bash --rcfile ~/.kbashrc"
+#	tmux set-option -s -t $SESSION default-command "source ~/.kbashrc $NAMESPACE"
 	tmux send-key "source ~/.kbashrc" Enter
 	tmux attach-session -d
 	tmux rename-window $NAMESPACE

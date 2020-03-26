@@ -7,7 +7,8 @@ fi
 
 kshell () {
 	if [ "$#" -eq 1 ]; then 
-#		source ~/.kbashrc $1
+#		export NAMESPACE=$1 
+#		source ~/.kbashrc
 		env NAMESPACE=$1 /bin/bash --rcfile ~/.kbashrc
 	else
 		echo "Please set a namespace from the list below [usage: kshell <namespace>]"
