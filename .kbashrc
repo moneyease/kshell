@@ -11,13 +11,28 @@ printoption() {
   echo ""
 }
 
+pods () {
+  kubectl get pods -n $NAMESPACE | nl -w2 -bp[a-z] -s'. '
+}
+
 pod () {
   if [ -z $PODNAME ]; then
     if [ "$#" -eq 0 ]; then 
-      kubectl get pods -n $NAMESPACE | nl -w2 -bp[a-z] -s'. '
+      while true; do
+       local npods=`kubectl get pods -n $NAMESPACE | wc -l`
+       pods
+       echo -n "Select a pod [0 to quit] > "
+       read selection
+       if [ $selection -eq 0 ]; then 
+           return
+       elif [ $selection -gt 0 ] && [ $selection -lt $npods ]; then 
+           pod $selection
+           return
+       fi
+       echo "Invalid selection $selection"
+    done
     else
       podname=$(kubectl get pods -n $NAMESPACE | grep -v NAME | sed -n "$1 p" | cut -d" " -f1)
-      debugf $podname
       export PODNAME=$podname
       PS1="\e[0;32m$NAMESPACE>\e[m\e[0;31m$PODNAME>\e[m "
       container $2
@@ -34,18 +49,19 @@ container ()  {
   fi
   clist=$(kubectl get pods -n $NAMESPACE $PODNAME -o=custom-columns=:.spec.containers[*].name |  grep .)
   if [ "$#" -eq 0 ]; then 
-    ccount=`echo $clist | tr ',' '\n' | wc -l`
-    if [ $ccount -gt 1 ]; then
+    nc=`echo $clist | tr ',' '\n' | wc -l`
+    if [ $nc -gt 1 ]; then
       while true; do
         echo $clist | tr ',' '\n' | nl -w2 -bp[a-z] -s'. '
         echo -n "Select a container [0 to quit] > "
         read selection
         if [ $selection -eq 0 ]; then 
           return
-        elif [ $selection -gt 0 ] && [ $selection -le $ccount ]; then 
+        elif [ $selection -gt 0 ] && [ $selection -le $nc ]; then 
           container $selection
           return
         fi
+        echo "Invalid selection $selection"
       done
     fi
   else
@@ -169,13 +185,15 @@ switch () {
       source ~/.kbashrc $namespace
       return
     fi
+    echo "Invalid selection $selection"
   done
 }
 help () {
         echo ""
-        echo "  pod       [pod][container]      Display pod status"
+        echo "  pods                            Display pods"
+        echo "  pod       [pod][container]      Select a pod/container"
         echo "  service                         Service"
-        echo "  container [container number]    Choose a container from the list"
+        echo "  container [container]           Choose a container from the list"
         echo "  describe                        Describe the pod"
         echo "  bash                            Enter a shell"
         echo "  cmd     <command>               Run a command in a container"
