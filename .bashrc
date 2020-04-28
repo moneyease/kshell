@@ -7,6 +7,7 @@ fi
 
 kshell () {
 	if [ "$#" -eq 1 ]; then 
+		echo "----> --> $1"
 		env NAMESPACE=$1 /bin/bash --rcfile ~/.kbashrc
 		return
 	fi

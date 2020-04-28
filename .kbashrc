@@ -1,160 +1,175 @@
 # .bashrc
+
+debugf () {
+  if [ ! -z $DEBUG ]; then
+    echo $@
+  fi
+}
 printoption() {
-	kubectl get pods -n $NAMESPACE -o=custom-columns=NAME:.metadata.name,CONTAINERS:.spec.containers[*].name | nl -w2 -bp[a-z] -s'. '
-	echo "Choose a pod from list pod [pod number] [container number]"
-	echo ""
+  kubectl get pods -n $NAMESPACE -o=custom-columns=NAME:.metadata.name,CONTAINERS:.spec.containers[*].name | nl -w2 -bp[a-z] -s'. '
+  echo "Choose a pod from list pod [pod number] [container number]"
+  echo ""
 }
 
 pod () {
-	if [ -z $PODNAME ]; then
-		if [ "$#" -eq 0 ]; then 
-			kubectl get pods -n $NAMESPACE | nl -w2 -bp[a-z] -s'. '
-		else
-			podname=$(kubectl get pods -n $NAMESPACE | grep -v NAME | sed -n "$1 p" | cut -d" " -f1)
-			export PODNAME=$podname
-			PS1="\e[0;32m$NAMESPACE>\e[m\e[0;31m$PODNAME>\e[m "
-			container $2
-		fi
-	else 
-		kubectl get pods -n $NAMESPACE -o wide $PODNAME
-	fi
+  if [ -z $PODNAME ]; then
+    if [ "$#" -eq 0 ]; then 
+      kubectl get pods -n $NAMESPACE | nl -w2 -bp[a-z] -s'. '
+    else
+      podname=$(kubectl get pods -n $NAMESPACE | grep -v NAME | sed -n "$1 p" | cut -d" " -f1)
+      debugf $podname
+      export PODNAME=$podname
+      PS1="\e[0;32m$NAMESPACE>\e[m\e[0;31m$PODNAME>\e[m "
+      container $2
+    fi
+  else 
+    kubectl get pods -n $NAMESPACE -o wide $PODNAME
+  fi
 }
 
 container ()  {
-	if [ -z $PODNAME ]; then
-		printoption
-		return
-	fi
-	clist=$(kubectl get pods -n $NAMESPACE $PODNAME -o=custom-columns=:.spec.containers[*].name |  grep .)
-	if [ "$#" -eq 0 ]; then 
-		ccount=`echo $clist | tr ',' '\n' | wc -l`
-		if [ $ccount -gt 1 ]; then
-		echo "Choose a container from list [container <number>]"
-		echo $clist | tr ',' '\n' | grep -n ^
-		else
-		container 1
-		fi
-	else
-		podtype=$(echo $clist | tr ',' '\n' | sed -n "$1 p")
-		export CONTAINER=$podtype
-		PS1="\e[0;32m$NAMESPACE>\e[m\e[0;31m$PODNAME>\e[m\e[m\e[0;36m$CONTAINER> \e[m"
-	fi
+  if [ -z $PODNAME ]; then
+    printoption
+    return
+  fi
+  clist=$(kubectl get pods -n $NAMESPACE $PODNAME -o=custom-columns=:.spec.containers[*].name |  grep .)
+  if [ "$#" -eq 0 ]; then 
+    ccount=`echo $clist | tr ',' '\n' | wc -l`
+    if [ $ccount -gt 1 ]; then
+      while true; do
+        echo $clist | tr ',' '\n' | nl -w2 -bp[a-z] -s'. '
+        echo -n "Select a container [0 to quit] > "
+        read selection
+        if [ $selection -eq 0 ]; then 
+          return
+        elif [ $selection -gt 0 ] && [ $selection -le $ccount ]; then 
+          container $selection
+          return
+        fi
+      done
+    fi
+  else
+    podtype=$(echo $clist | tr ',' '\n' | sed -n "$1 p")
+    export CONTAINER=$podtype
+    PS1="\e[0;32m$NAMESPACE>\e[m\e[0;31m$PODNAME>\e[m\e[m\e[0;36m$CONTAINER> \e[m"
+  fi
 }
 
 quit () {
-	if [ -z $PODNAME ]; then
-		exit
-	elif [ -z $CONTAINER ]; then
-		export PODNAME=""
-		PS1="\e[0;32m$NAMESPACE > \e[m"
-	else
-		export CONTAINER=""
-		PS1="\e[0;32m$NAMESPACE>\e[m\e[0;31m$PODNAME>\e[m "
-	fi
+  if [ -z $PODNAME ]; then
+    tmux kill-session -t $SESSION
+    export SESSION=""
+  elif [ -z $CONTAINER ]; then
+    export PODNAME=""
+    PS1="\e[0;32m$NAMESPACE > \e[m"
+  else
+    export CONTAINER=""
+    PS1="\e[0;32m$NAMESPACE>\e[m\e[0;31m$PODNAME>\e[m "
+  fi
 }
 
 bash () {
-	if [ -z $CONTAINER ]; then
-		kubectl exec -it $PODNAME -n $NAMESPACE -- /bin/bash
-	else
-		kubectl exec -it $PODNAME -n $NAMESPACE -c $CONTAINER -- /bin/bash
-	fi
+  if [ -z $CONTAINER ]; then
+    kubectl exec -it $PODNAME -n $NAMESPACE -- /bin/bash
+  else
+    kubectl exec -it $PODNAME -n $NAMESPACE -c $CONTAINER -- /bin/bash
+  fi
 }
 
 cmd () {
-	if [ -z $PODNAME ]; then
-		printoption
-		return
-	fi
-	echo $@
-	if [ -z $CONTAINER ]; then
-		kubectl exec -it $PODNAME -n $NAMESPACE -- "$@"
-	else
-		kubectl exec -it $PODNAME -n $NAMESPACE -c $CONTAINER -- "$@"
-	fi
+  if [ -z $PODNAME ]; then
+    printoption
+    return
+  fi
+  echo $@
+  if [ -z $CONTAINER ]; then
+    kubectl exec -it $PODNAME -n $NAMESPACE -- "$@"
+  else
+    kubectl exec -it $PODNAME -n $NAMESPACE -c $CONTAINER -- "$@"
+  fi
 }
 
 cpfrom () {
-	if [ -z $PODNAME ]; then
-		printoption
-		return
-	fi
-	if [ -z $CONTAINER ]; then
-		kubectl cp $NAMESPACE/$PODNAME:$1 $2
-	else
-		kubectl cp $NAMESPACE/$PODNAME:$1 $2 -c $CONTAINER
-	fi
+  if [ -z $PODNAME ]; then
+    printoption
+    return
+  fi
+  if [ -z $CONTAINER ]; then
+    kubectl cp $NAMESPACE/$PODNAME:$1 $2
+  else
+    kubectl cp $NAMESPACE/$PODNAME:$1 $2 -c $CONTAINER
+  fi
 }
 cpto () {
-	if [ -z $PODNAME ]; then
-		printoption
-		return
-	fi
-	if [ -z $CONTAINER ]; then
-		kubectl cp $1 $NAMESPACE/$PODNAME:$2
-	else
-		kubectl cp $1 $NAMESPACE/$PODNAME:$2 -c $CONTAINER
-	fi
+  if [ -z $PODNAME ]; then
+    printoption
+    return
+  fi
+  if [ -z $CONTAINER ]; then
+    kubectl cp $1 $NAMESPACE/$PODNAME:$2
+  else
+    kubectl cp $1 $NAMESPACE/$PODNAME:$2 -c $CONTAINER
+  fi
 }
 service () {
-	kubectl get service -n $NAMESPACE -o wide
+  kubectl get service -n $NAMESPACE -o wide
 }
 
 log () {
-	if [ -z $PODNAME ]; then
-		printoption
-		return
-	fi
-	if [ -z $CONTAINER ]; then
-		kubectl logs $1  $PODNAME -n $NAMESPACE
-	else
-		kubectl logs $1  $PODNAME -n $NAMESPACE -c $CONTAINER
-	fi
+  if [ -z $PODNAME ]; then
+    printoption
+    return
+  fi
+  if [ -z $CONTAINER ]; then
+    kubectl logs $1  $PODNAME -n $NAMESPACE
+  else
+    kubectl logs $1  $PODNAME -n $NAMESPACE -c $CONTAINER
+  fi
 }
 
 logall () {
-	if [ -z $PODNAME ]; then
-		printoption
-		return
-	fi
-	appname=`kubectl get pod $PODNAME  -o template --template='{{.metadata.labels}}' -n filemgr-qa4 | cut -d: -f2 | cut -d" "  -f1`
-	if [ -z $CONTAINER ]; then
-		kubectl logs --selector app=$appname -n $NAMESPACE  $1
-	else
-		kubectl logs --selector app=$appname -n $NAMESPACE -c $CONTAINER $1
-	fi
+  if [ -z $PODNAME ]; then
+    printoption
+    return
+  fi
+  appname=`kubectl get pod $PODNAME  -o template --template='{{.metadata.labels}}' -n $NAMESPACE | cut -d: -f2 | cut -d" "  -f1`
+  if [ -z $CONTAINER ]; then
+    kubectl logs --selector app=$appname -n $NAMESPACE  $1
+  else
+    kubectl logs --selector app=$appname -n $NAMESPACE -c $CONTAINER $1
+  fi
 }
 
 describe () {
-	kubectl describe pod -n $NAMESPACE $PODNAME
+  kubectl describe pod -n $NAMESPACE $PODNAME
 }
 
 split () {
-        tmux split-window -v
-        tmux select-layout even-vertical
+        tmux split-window\; \
+             send-key "source ~/.kbashrc $NAMESPACE" Enter \; \
+             select-layout even-vertical \;
 }
 
 change () {
-	selection=0
-	if [ "$#" -gt 0 ];then
-		export NAMESPACE=$1 
-		source ~/.kbashrc
-		return
-	fi
-	kubectl get namespaces | awk '{print $1}' | nl -w2 -bp[a-z] -s'. ' 
-	max=`kubectl get namespaces | wc -l`
-	while true; do
-		echo -n "Select a namespace [0 to quit] > "
-		read selection
-		if [ $selection -eq 0 ]; then 
-			return
-		elif [ $selection -gt 0 ] && [ $selection -lt $max ]; then 
-			namespace=$(kubectl get namespaces | grep -v NAME | sed -n "$selection p" | cut -d" " -f1)
-			export NAMESPACE=$namespace 
-			source ~/.kbashrc
-			return
-		fi
-	done
+  selection=0
+  if [ "$#" -gt 0 ];then
+    export NAMESPACE=$1 
+    source ~/.kbashrc
+    return
+  fi
+  kubectl get namespaces | awk '{print $1}' | nl -w2 -bp[a-z] -s'. ' 
+  max=`kubectl get namespaces | wc -l`
+  while true; do
+    echo -n "Select a namespace [0 to quit] > "
+    read selection
+    if [ $selection -eq 0 ]; then 
+      return
+    elif [ $selection -gt 0 ] && [ $selection -lt $max ]; then 
+      namespace=$(kubectl get namespaces | grep -v NAME | sed -n "$selection p" | cut -d" " -f1)
+      source ~/.kbashrc $namespace
+      return
+    fi
+  done
 }
 help () {
         echo ""
@@ -162,27 +177,26 @@ help () {
         echo "  service                         Service"
         echo "  container [container number]    Choose a container from the list"
         echo "  describe                        Describe the pod"
-        echo "  describe                        Describe the pod"
         echo "  bash                            Enter a shell"
         echo "  cmd     <command>               Run a command in a container"
         echo "  cpto    <local> <remote>        Copy from local to pod"
         echo "  cpfrom  <remote> <local>        Copy from pod to local"
         echo "  log [-f]                        Container log"
         echo "  split                           Split panes [C-A y to send command to all panes]"
-        echo "  change [namespace] 		Change namespace"	
+        echo "  change [namespace]     Change namespace"  
         echo ""
 }
 
 # Uncomment the following line if you don't like systemctl's auto-paging feature:
 # export SYSTEMD_PAGER=x
-if [ -z $SESSION ];then
-	export SESSION=`date +%s`
-	tmux -f ~/.tmux.conf new-session -s $SESSION -d
-	tmux set-option -s -t $SESSION default-command "env NAMESPACE=$NAMESPACE /bin/bash --rcfile ~/.kbashrc"
-#	tmux set-option -s -t $SESSION default-command "source ~/.kbashrc $NAMESPACE"
-	tmux send-key "source ~/.kbashrc" Enter
-	tmux attach-session -d
-	tmux rename-window $NAMESPACE
+if [ "$#" -gt 0 ];then
+  export NAMESPACE=$1
+  export PS1="\e[0;32m$NAMESPACE>\e[m"
+else
+  export SESSION=`date +%s`
+                tmux -f ~/.tmux.conf new-session -s $SESSION -d \; \
+                     send-key "source ~/.kbashrc $NAMESPACE" Enter \; \
+                     attach-session -d \; \
+                     rename-window $NAMESPACE \;
 fi
-export PS1="\e[0;32m$NAMESPACE>\e[m"
 # User specific aliases and functions
