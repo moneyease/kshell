@@ -145,12 +145,12 @@ describe () {
 }
 
 split () {
-        tmux split-window\; \
-             send-key "source ~/.kbashrc $NAMESPACE" Enter \; \
-             select-layout even-vertical \;
+   tmux split-window $1\; \
+        send-key "source ~/.kbashrc $NAMESPACE" C-m \; \
+        select-layout even-vertical \;
 }
 
-change () {
+switch () {
   selection=0
   if [ "$#" -gt 0 ];then
     export NAMESPACE=$1 
@@ -183,7 +183,7 @@ help () {
         echo "  cpfrom  <remote> <local>        Copy from pod to local"
         echo "  log [-f]                        Container log"
         echo "  split                           Split panes [C-A y to send command to all panes]"
-        echo "  change [namespace]     Change namespace"  
+        echo "  switch [namespace]              Switch namespace"  
         echo ""
 }
 
@@ -195,7 +195,7 @@ if [ "$#" -gt 0 ];then
 else
   export SESSION=`date +%s`
                 tmux -f ~/.tmux.conf new-session -s $SESSION -d \; \
-                     send-key "source ~/.kbashrc $NAMESPACE" Enter \; \
+                     send-key "source ~/.kbashrc $NAMESPACE" C-m \; \
                      attach-session -d \; \
                      rename-window $NAMESPACE \;
 fi
